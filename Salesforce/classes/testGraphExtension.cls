@@ -21,6 +21,7 @@ public with sharing class testGraphExtension {
 	static OpportunityContactRole ocr;
 	static Profile p;
 	static User pu, u;
+	static CollaborationGroup cg;
 	
 	static {
     	pAcc = new Account();
@@ -71,13 +72,23 @@ public with sharing class testGraphExtension {
         u.TimeZoneSidKey = 'America/Los_Angeles';
         u.Username = 'standuser@testorg.com';
         
+        cg = new CollaborationGroup(Name = 'Test Group', CollaborationType = 'Public');
         
-        
+        // insert Collaboration Group
+        insert cg;
 		//insert parent user
 		insert pu;
 		//insert User
 		u.ManagerId = pu.Id;
 		insert u;
+		
+		// Insert Collaboration Group Memberships
+		List<CollaborationGroupMember> lCGM = new List<CollaborationGroupMember>{
+			new CollaborationGroupMember(MemberId = pu.Id, CollaborationGroupId = cg.Id),
+			new CollaborationGroupMember(MemberId = u.Id, CollaborationGroupId = cg.Id)
+		};
+		insert lCGM;
+		
 		//insert Parent Account
 		pAcc.OwnerId = u.Id;
 		insert pAcc;
@@ -123,9 +134,7 @@ public with sharing class testGraphExtension {
 	        
         test.stopTest();
         
-        System.Assert(graphExt.rootNodes.containsKey(acc.Id)); // The root node list contains the input node
-        
-        System.AssertEquals(5, graphExt.nodeList.size());
+        System.AssertEquals(4, graphExt.nodeList.size());
         for (GraphController.Node node: graphExt.nodeList) {
         	if (node.id == (String)acc.Id) {
         		System.Assert(node.IsRoot);
@@ -135,7 +144,7 @@ public with sharing class testGraphExtension {
         	System.AssertNotEquals(node.Id, u.Id);
         }
         
-        System.AssertEquals(7, graphExt.LinkList.size());
+        System.AssertEquals(5, graphExt.LinkList.size());
         for (GraphController.Link Link: graphExt.LinkList) {
         	if (Link.fromId == (String)acc.Id) {
         		System.AssertEquals(0, Link.depth);
@@ -161,10 +170,8 @@ public with sharing class testGraphExtension {
 	        
         test.stopTest();
         
-        System.Assert(graphExt.rootNodes.containsKey(acc.Id)); // The root node list contains the input node
-        
         // We have two root nodes this time
-        System.AssertEquals(6, graphExt.nodeList.size());
+        System.AssertEquals(8, graphExt.nodeList.size());
         for (GraphController.Node node: graphExt.nodeList) {
         	if (node.id == (String)acc.Id) {
         		System.Assert(node.IsRoot);
@@ -177,10 +184,6 @@ public with sharing class testGraphExtension {
         }
         
         // We do NOT have any additional Links
-        System.AssertEquals(7, graphExt.LinkList.size());
-        for (GraphController.Link Link: graphExt.LinkList) {
-        	System.AssertNotEquals(Link.toId, u.Id);
-        	System.AssertNotEquals(Link.fromId, u.Id);
-        }
+        System.AssertEquals(9, graphExt.LinkList.size());
     }
 }

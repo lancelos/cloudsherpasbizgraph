@@ -153,12 +153,12 @@ global with sharing class GraphExtension extends GraphController {
 			}
 		}
 		else if (typ == 'Opportunity') {
-			List<Opportunity> lstObj = new List<Opportunity>([SELECT Id, OwnerId, Owner.Name, Name, Amount, StageName, AccountId, Description, (Select Id, ContactId, OpportunityId, Role FROM OpportunityContactRoles) FROM Opportunity WHERE (ID in :IDs)]);
+			List<Opportunity> lstObj = new List<Opportunity>([SELECT Id, OwnerId, Probability, Owner.Name, Name, Amount, StageName, AccountId, Description, (Select Id, ContactId, OpportunityId, Role FROM OpportunityContactRoles) FROM Opportunity WHERE (ID in :IDs)]);
 			for (Opportunity obj : lstObj) {
 				GraphController.Node node = new GraphController.Node();
 				node.id = obj.Id;
 				node.label = obj.Name;
-				node.relevance = 100.0;
+				node.relevance = obj.Probability;
 				node.typ = 'Opportunity';
 				node.descr = obj.Description;
 				myNodes.put(node.id, node);
@@ -180,19 +180,57 @@ global with sharing class GraphExtension extends GraphController {
 		// It could make sense to add links FROM the User, though if you wanted to do a graph of Cases, Opportunities, etc owned by a user.
 		// If you do so, consider filtering the list to include (eg) only open Cases or only high-value Opportunities.
 		else if (typ == 'User') {
-			List<User> lstObj = new List<User>([SELECT Id, Name, ManagerId FROM User WHERE (ID in :IDs)]);
-			for (User obj : lstObj) {
+			Map<Id, User> lstObj = new Map<Id, User>([SELECT Id, Name, ManagerId, SmallPhotoURL FROM User WHERE (ID in :IDs) LIMIT 2000]);
+			
+			for (User obj : lstObj.values()) {
 				GraphController.Node node = new GraphController.Node();
 				node.id = obj.Id;
 				node.label = obj.Name;
 				node.relevance = 100.0;
 				node.typ = 'User';
 				node.descr = obj.Name;
-				node.IsLeaf = true;
+				node.dat.put('SmallPhotoURL', obj.SmallPhotoURL);
 				myNodes.put(node.id, node);
 				
-				GraphController.Link Link = new GraphController.Link(obj.Id, obj.ManagerId, 'User', 'Manager');
-				Link.relationship = 'Manager';
+				if (obj.ManagerId != null) {
+					GraphController.Link Link = new GraphController.Link(obj.Id, obj.ManagerId, 'User', 'Manager');
+					Link.relationship = 'Manager';
+					myLinks.put(Link.id, Link);
+				}
+			}
+			
+			List<CollaborationGroupMember> membership = new List<CollaborationGroupMember>([SELECT Id, MemberId, CollaborationGroupId FROM CollaborationGroupMember WHERE (MemberId in :lstObj.keySet()) LIMIT 2000]);
+			
+			for (CollaborationGroupMember obj : membership) {
+				if (obj.MemberId == null || obj.CollaborationGroupID == null) continue;
+				
+				GraphController.Link Link = new GraphController.Link(obj.MemberId, obj.CollaborationGroupId, 'User', 'Group');
+				Link.relationship = 'Member';
+				myLinks.put(Link.id, Link);
+			}
+		}
+		else if (typ == 'CollaborationGroup') {
+			Map<Id, CollaborationGroup> lstObj = new Map<Id, CollaborationGroup>([SELECT Id, Name, Description, SmallPhotoURL, CollaborationType FROM CollaborationGroup WHERE (ID in :IDs) LIMIT 2000]);
+			
+			for (CollaborationGroup obj : lstObj.values()) {
+				GraphController.Node node = new GraphController.Node();
+				node.id = obj.Id;
+				node.label = obj.Name;
+				node.relevance = 100.0;
+				node.typ = 'Group';
+				node.descr = obj.Description;
+				node.dat.put('SmallPhotoURL', obj.SmallPhotoURL);
+				node.dat.put('CollaborationType', obj.CollaborationType);
+				myNodes.put(node.id, node);
+			}
+		
+			List<CollaborationGroupMember> membership = new List<CollaborationGroupMember>([SELECT Id, MemberId, CollaborationGroupId FROM CollaborationGroupMember WHERE (CollaborationGroupId in :lstObj.keySet()) LIMIT 2000]);
+			
+			for (CollaborationGroupMember obj : membership) {
+				if (obj.MemberId == null || obj.CollaborationGroupID == null) continue;
+				
+				GraphController.Link Link = new GraphController.Link(obj.MemberId, obj.CollaborationGroupId, 'User', 'Group');
+				Link.relationship = 'Member';
 				myLinks.put(Link.id, Link);
 			}
 		}

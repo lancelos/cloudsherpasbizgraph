@@ -2,8 +2,27 @@
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>BizGraph</fullName>
     <types>
+        <members>GraphController</members>
         <members>GraphExtension</members>
+        <members>testGraphExtension</members>
         <name>ApexClass</name>
     </types>
-    <version>28.0</version>
+    <types>
+        <members>Graph</members>
+        <name>ApexComponent</name>
+    </types>
+    <types>
+        <members>AccountGraph</members>
+        <members>CaseGraph</members>
+        <members>ContactGraph</members>
+        <members>GenericGraph</members>
+        <members>GraphData</members>
+        <members>OpportunityGraph</members>
+        <name>ApexPage</name>
+    </types>
+    <types>
+        <members>BizGraph</members>
+        <name>StaticResource</name>
+    </types>
+    <version>29.0</version>
 </Package>

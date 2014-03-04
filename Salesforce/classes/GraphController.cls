@@ -19,20 +19,20 @@ global abstract with sharing class GraphController {
 	global Decimal decayRate {get; set;}
 	
 	// The set of root IDs to be displayed on the Graph
-	private Set<Id> rootIDs {get; set;}
+	protected Set<Id> rootIDs {get; set;}
 	// The set of root nodes
-	global Map<Id, GraphController.Node> rootNodes = new Map<Id, GraphController.Node>();
+	protected Map<Id, GraphController.Node> rootNodes = new Map<Id, GraphController.Node>();
 	
 	// The set of all queried nodes and Links
-	private Map<Id, GraphController.Node> nodes = new Map<Id, GraphController.Node>();
-	private Map<String, GraphController.Link> Links = new Map<String, GraphController.Link>();
+	protected Map<Id, GraphController.Node> nodes = new Map<Id, GraphController.Node>();
+	protected Map<String, GraphController.Link> Links = new Map<String, GraphController.Link>();
 		
 	// The set of all relevant nodes and all the Links that are attached to *two* relevant nodes
-	private Map<Id, GraphController.Node> relevantNodes = null;
-	private Map<String, GraphController.Link> relevantLinks = null;
+	protected Map<Id, GraphController.Node> relevantNodes = null;
+	protected Map<String, GraphController.Link> relevantLinks = null;
 	
 	// The set of leaf nodes (nodes that will not be spidered, but that will be displayed)
-	private Map<Id, GraphController.Node> leafNodes = new Map<Id, GraphController.Node>();
+	protected Map<Id, GraphController.Node> leafNodes = new Map<Id, GraphController.Node>();
 	
 	// The list of nodes to be displayed
 	global List<GraphController.Node> nodeList {
@@ -121,6 +121,8 @@ global abstract with sharing class GraphController {
 		
 		// Identify the set of nodes that have at least the minimum relevance, and the list of Links that connect to relevant nodes
 		for (GraphController.Link Link : Links.values()) {
+			if (Link.toId == Link.fromId) continue; // We never follow recursive links
+			
 			if (relevantNodes.containsKey(Link.fromId) && relevantNodes.containsKey(Link.toId))
 				relevantLinks.put(Link.id, Link);
 		}
@@ -172,17 +174,18 @@ global abstract with sharing class GraphController {
 		// For each of the new Links 
 		for (GraphController.Link Link : newLinks.values()) {
 			// Don't add Links with the same ID. The ID consists of the source ID, the Target ID, and the Role
-			if (!Links.containsKey(Link.id)) {
-				// We only follow Links that are attached to a relevant node
-				if (relevantNodes.containsKey(Link.fromId) || relevantNodes.containsKey(Link.toId)) {
-					Link.depth = depth;
-					Links.put(Link.id, Link);
-					
-					// We make a list of all the IDs that are in the next and current level
-					// We never follow Links that are attached to Lead nodes
-					if (!leafNodes.containsKey(Link.fromId)) nextNodeIDs.add(Link.toId);
-					if (!leafNodes.containsKey(Link.toId)) nextNodeIDs.add(Link.fromId);
-				}
+			if (Links.containsKey(Link.id)) continue;
+			if (Link.toId == Link.fromId) continue; // We never follow recursive links
+			
+			// We only follow Links that are attached to a relevant node
+			if (relevantNodes.containsKey(Link.fromId) || relevantNodes.containsKey(Link.toId)) {
+				Link.depth = depth;
+				Links.put(Link.id, Link);
+				
+				// We make a list of all the IDs that are in the next and current level
+				// We never follow Links that are attached to Leaf nodes
+				if (!leafNodes.containsKey(Link.fromId)) nextNodeIDs.add(Link.toId);
+				if (!leafNodes.containsKey(Link.toId)) nextNodeIDs.add(Link.fromId);
 			}
 		}
 		
@@ -223,11 +226,13 @@ global abstract with sharing class GraphController {
 	
 	// Returns true if we are nearing one or more of the relevant governor limits
 	private static Boolean nearLimits() {
-		if (Limits.getQueryRows() >= (Limits.getLimitQueryRows() * 0.9)) return true;
-		if (Limits.getQueries() >= (Limits.getLimitQueries() * 0.9)) return true;
-		if (Limits.getCpuTime() >= (Limits.getLimitCpuTime() * 0.9)) return true;
-		if (Limits.getHeapSize() >= (Limits.getLimitHeapSize() * 0.9)) return true;
-		if (Limits.getScriptStatements() >= (Limits.getLimitScriptStatements() * 0.9)) return true;
+		if (Limits.getQueryRows() >= (Limits.getLimitQueryRows() * 0.95)) return true;
+		if (Limits.getQueries() >= (Limits.getLimitQueries() * 0.95)) return true;
+		if (Limits.getCpuTime() >= (Limits.getLimitCpuTime() * 0.95)) return true;
+		if (Limits.getHeapSize() >= (Limits.getLimitHeapSize() * 0.95)) return true;
+		
+		// Removed 2014-04-04 because script statement limits are no longer used
+		// if (Limits.getScriptStatements() >= (Limits.getLimitScriptStatements() * 0.95)) return true;
 		
 		return false;
 	}
@@ -249,7 +254,6 @@ global abstract with sharing class GraphController {
 			}
 		}
 		global String descr {get; set;}
-		global String dat {get; set;}
 		global String url {get; set;}
 		
 		global Decimal relevance {get; set;}
@@ -262,9 +266,12 @@ global abstract with sharing class GraphController {
 		
 		global Decimal decayedRelevance {get; set;}
 		
+		global Map<String, String> dat {get; set;}
+		
 		global Node() {
 			this.IsRoot = false;
 			this.IsLeaf = false;
+			this.dat = new map<String, String>();
 		}
 		
 		global Integer compareTo(Object compareTo) {
@@ -288,6 +295,8 @@ global abstract with sharing class GraphController {
 		
 		global Integer depth {get; set;}
 		
+		global Map<String, String> dat {get; set;}
+		
 		// Create a new Link with a role
 		global Link(Id fromId, Id toId, String fromRole, String toRole) {
 			this.fromId = fromId;
@@ -296,6 +305,7 @@ global abstract with sharing class GraphController {
 			this.toRole = toRole;
 			this.weight = 1.0;
 			this.relationship = this.fromRole + ' -> ' + this.toRole;
+			this.dat = new map<String, String>();
 			
 			this.id = this.fromRole + ':' + this.fromId + '->' + this.toRole + ':' + this.toId;
 		}
