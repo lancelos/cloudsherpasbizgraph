@@ -36,8 +36,10 @@ function BizGraph(el, dataURL, fullURL) {
     // You can tweak these numbers if you don't like how the engine behaves
     graph.force = d3.layout.force()
         .gravity(0.05)
-        .distance(90)
-        .charge(-600)
+        .distance(function (d) {
+            return 250.0 - (d.decayedRelevance * 1.5);
+        })
+        .charge(-300)
         .linkStrength(function (d) {
             return d.decayedRelevance / 100.0;
         })
@@ -64,6 +66,7 @@ function BizGraph(el, dataURL, fullURL) {
         // ERASE THE EXISTING NODES
         graph.svg.select(".link").remove();
         graph.svg.select(".node").remove();
+        graph.svg.select("defs").remove();
 
         // STYLE THE LINK
         var link = graph.svg.selectAll(".link")
@@ -82,6 +85,20 @@ function BizGraph(el, dataURL, fullURL) {
             .text(function (d) {
                 return d.relationship
             });
+            
+        var defs = graph.svg.append("defs").selectAll("pattern")
+            .data(graph.nodes)
+            .enter();
+        
+        var pattern = defs.append("pattern")
+        	.attr("id", function(d) { return d.id; } )
+        	.attr("x","0").attr("y","0")
+        	.attr("patternUnits","objectBoundingBox")
+        	.attr("height","45").attr("width","45")
+        	.append("image")
+        	.attr("x","0").attr("y","0")
+        	.attr("xlink:href", function (d) { return d.dat.SmallPhotoURL; })
+        	.attr("height","45").attr("width","45");
 
         var node = graph.svg.selectAll(".node")
             .data(graph.nodes)
@@ -91,10 +108,16 @@ function BizGraph(el, dataURL, fullURL) {
         var circle = node.append("circle")
             .attr("class", "node")
             .attr("r", function (d) {
+            	return "22";
                 return (d.IsRoot ? 12 : 8);
             })
             .style("fill", function (d) {
-                return d3.interpolateRgb("#FFF", graph.nodeColor(d.typ))(d.decayedRelevance / 100);
+            	if (d.dat.SmallPhotoURL) {
+            		return "url(#" + d.id + ") " + d3.interpolateRgb("#FFF", graph.nodeColor(d.typ))(d.decayedRelevance / 100);
+            	}
+            	else {
+                	return d3.interpolateRgb("#FFF", graph.nodeColor(d.typ))(d.decayedRelevance / 100);
+                }
             })
         //.style("opacity", function(d) { return d.decayedRelevance / 100; })
         .style("stroke", "#FFF")
@@ -166,9 +189,9 @@ function BizGraph(el, dataURL, fullURL) {
             for (i = 0; i < json.nodes.length; i++) {
                 var node = json.nodes[i];
                 if (!graph.nodeMap[node.id]) {
-                    if (node.dat) {
-                        node.dat = JSON.parse(node.dat);
-                    }
+                    //if (node.dat) {
+                    //    node.dat = JSON.parse(node.dat);
+                    //}
                     graph.nodes.push(node);
                     graph.nodeMap[node.id] = node;
                 }
